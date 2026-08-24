@@ -38,7 +38,29 @@ interface IAuthenticatedUsers {
   updateFrom: (req: Request, user: ResponseWithUser) => any
 }
 
-export const hash = (data: string) => crypto.createHash('md5').update(data).digest('hex')
+const PASSWORD_HASH_SALT = process.env.PASSWORD_HASH_SALT ?? 'juice-shop-default-password-salt'
+const PASSWORD_HASH_SCRYPT_PARAMS = {
+  N: 16384, // CPU/memory cost (work factor)
+  r: 8,
+  p: 1,
+  keyLen: 64
+}
+
+export const hash = (data: string) => {
+  const salt = crypto.createHash('sha256').update(PASSWORD_HASH_SALT).digest()
+  const derivedKey = crypto.scryptSync(
+    data,
+    salt,
+    PASSWORD_HASH_SCRYPT_PARAMS.N,
+    PASSWORD_HASH_SCRYPT_PARAMS.r,
+    PASSWORD_HASH_SCRYPT_PARAMS.p,
+    PASSWORD_HASH_SCRYPT_PARAMS.keyLen
+  )
+
+  // Self-describing format to allow future migrations/upgrades.
+  return `scrypt$${PASSWORD_HASH_SCRYPT_PARAMS.N}$${PASSWORD_HASH_SCRYPT_PARAMS.r}$${PASSWORD_HASH_SCRYPT_PARAMS.p}$${salt.toString('hex')}$${derivedKey.toString('hex')}`
+}
+
 export const hmac = (data: string) => crypto.createHmac('sha256', 'pa4qacea4VK9t9nGv7yZtwmj').update(data).digest('hex')
 
 export const cutOffPoisonNullByte = (str: string) => {
